@@ -342,7 +342,6 @@ This " contains " embedded " quotes
 <keyword value="{pf64}" anchor="pf64" />
 <keyword value="{reg:...}" anchor="reg" />
 <keyword value="{sd}" anchor="sd" />
-<keyword value="{sendto}" anchor="sendto" />
 <keyword value="{src}" anchor="src" />
 <keyword value="{srcexe}" anchor="srcexe" />
 <keyword value="{sys}" anchor="sys" />
@@ -362,6 +361,7 @@ This " contains " embedded " quotes
 <keyword value="{username}" anchor="username" />
 <keyword value="{userpf}" anchor="userpf" />
 <keyword value="{userprograms}" anchor="userprograms" />
+<keyword value="{usersendto}" anchor="usersendto" />
 <keyword value="{userstartmenu}" anchor="userstartmenu" />
 <keyword value="{userstartup}" anchor="userstartup" />
 <keyword value="{usertemplates}" anchor="usertemplates" />
@@ -530,11 +530,6 @@ For example: If you used <tt>{src}\MYPROG.EXE</tt> on an entry and the user is i
 <p>The path to the local (nonroaming) Application Data folder.</p>
 </dd>
 
-<dt><b><a name="sendto">{sendto}</a></b></dt>
-<dd>
-<p>The path to the current user's Send To folder. (There is no common Send To folder.)</p>
-</dd>
-
 <dt><b><a name="userappdata">{userappdata}</a></b> &amp; <b><a name="commonappdata">{commonappdata}</a></b></dt>
 <dd>
 <p>The path to the Application Data folder.</p>
@@ -568,6 +563,11 @@ For example: If you used <tt>{src}\MYPROG.EXE</tt> on an entry and the user is i
 <dt><b><a name="userprograms">{userprograms}</a></b> &amp; <b><a name="commonprograms">{commonprograms}</a></b> *</dt>
 <dd>
 <p>The path to the Programs folder on the Start Menu.</p>
+</dd>
+
+<dt><b><a name="usersendto">{usersendto}</a></b></dt>
+<dd>
+<p>The path to the current user's Send To folder. (There is no common Send To folder.)</p>
 </dd>
 
 <dt><b><a name="userstartmenu">{userstartmenu}</a></b> &amp; <b><a name="commonstartmenu">{commonstartmenu}</a></b> *</dt>
@@ -919,6 +919,7 @@ DefaultGroupName=My Program
 <li><link topic="setup_solidcompression">SolidCompression</link></li>
 <li><link topic="setup_sourcedir">SourceDir</link></li>
 <li><link topic="setup_terminalservicesaware">TerminalServicesAware</link></li>
+<li><link topic="setup_useduserareaswarning">UsedUserAreasWarning</link></li>
 <li><link topic="setup_usesetupldr">UseSetupLdr</link></li>
 <li><link topic="setup_versioninfocompany">VersionInfoCompany</link></li>
 <li><link topic="setup_versioninfocopyright">VersionInfoCopyright</link></li>
@@ -3806,6 +3807,14 @@ Name: portablemode; Description: "Portable Mode"</pre></example>
 </body>
 </setuptopic>
 
+<setuptopic directive="UsedUserAreasWarning">
+<setupvalid><link topic="yesnonotes"><tt>yes</tt> or <tt>no</tt></link></setupvalid>
+<setupdefault><tt>yes</tt></setupdefault>
+<body>
+<p>This directive lets you disable the used user areas warning. See <link topic="setup_privilegesrequired">PrivilegesRequired</link> for more information.</p>
+</body>
+</setuptopic>
+
 <setuptopic directive="PrivilegesRequired">
 <setupvalid><tt>poweruser</tt>, <tt>admin</tt>, or <tt>lowest</tt></setupvalid>
 <setupdefault><tt>admin</tt></setupdefault>
@@ -3823,7 +3832,7 @@ Name: portablemode; Description: "Portable Mode"</pre></example>
 <!-- <p>When set to <tt>none</tt> Setup will not check the user's group membership. Do not use this setting unless you are sure your installation will run successfully on unprivileged accounts.</p> -->
 <p>When set to <tt>lowest</tt> Setup will not check the user's group membership. Additionally, the uninstall info root key will always be HKEY_CURRENT_USER, and the "common" forms of the Shell Folder constants are mapped to the "user" forms, even if administrative privileges are available. Do not use this setting unless you are sure your installation will run successfully on unprivileged accounts.</p>
 <p><b>Note:</b></p>
-<p>Regardless of the version of Windows, only if the installation is per-user (<tt>PrivilegesRequired=lowest</tt>) you may touch Windows' per-user areas from your script.</p>
+<p>Regardless of the version of Windows, if the installation is administrative (<tt>PrivilegesRequired=admin</tt> or <tt>PrivilegesRequired=poweruser</tt>) then you should be careful about making any per-user area changes: such changes may not achieve what you are intending. The compiler will warn you about this, which can be disabled using <link topic="setup_useduserareaswarning">UsedUserAreasWarning</link>.</p>
 </body>
 </setuptopic>
 
@@ -4452,7 +4461,7 @@ DiskSliceSize=1457664
 <setuptopic directive="WizardImageFile">
 <setupdefault><tt>compiler:WIZMODERNIMAGE.BMP</tt></setupdefault>
 <body>
-<p>Specifies the name(s) of the bitmap file(s) to display on the left side of the wizard. The files(s) must be located in your installation's <link topic="sourcedirectorynotes">source directory</link> when running the Setup Compiler, unless a fully qualified pathname is specified or the pathname is prefixed by "compiler:", in which case it looks for the file in the Compiler directory.</p>
+<p>Specifies the name(s) of the bitmap file(s) to display on the left side of the wizard. Wildcards are supported and the files(s) must be located in your installation's <link topic="sourcedirectorynotes">source directory</link> when running the Setup Compiler, unless a fully qualified pathname is specified or the pathname is prefixed by "compiler:", in which case it looks for the file in the Compiler directory.</p>
 <p>256-color bitmaps may not display correctly in 256-color mode, since it does not handle palettes.</p>
 <p>When multiple files are specified, Setup will automatically select the one which best matches the system's DPI setting. The recommended size of the bitmap per DPI setting is:</p>
 <table>
@@ -4475,7 +4484,7 @@ DiskSliceSize=1457664
 <setuptopic directive="WizardSmallImageFile">
 <setupdefault><tt>compiler:WIZMODERNSMALLIMAGE.BMP</tt></setupdefault>
 <body>
-<p>Specifies the name(s) of the bitmap file(s) to display in the upper right corner of the wizard. The file(s) must be located in your installation's <link topic="sourcedirectorynotes">source directory</link> when running the Setup Compiler, unless a fully qualified pathname is specified or the pathname is prefixed by "compiler:", in which case it looks for the file in the Compiler directory.</p>
+<p>Specifies the name(s) of the bitmap file(s) to display in the upper right corner of the wizard. Wildcards are supported and the file(s) must be located in your installation's <link topic="sourcedirectorynotes">source directory</link> when running the Setup Compiler, unless a fully qualified pathname is specified or the pathname is prefixed by "compiler:", in which case it looks for the file in the Compiler directory.</p>
 <p>256-color bitmaps may not display correctly in 256-color mode, since it does not handle palettes.</p>
 <p>When multiple files are specified, Setup will automatically select the one which best matches the system's DPI setting. The recommended size of the bitmap per DPI setting is:</p>
 <table>

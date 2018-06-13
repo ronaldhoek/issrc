@@ -874,6 +874,16 @@ end;</pre></example>
         <prototype>function CompareStr(const S1, S2: string): Integer;</prototype>
         <description><p>Compares S1 to S2, with case-sensitivity. The return value is less than 0 if S1 is less than S2, 0 if S1 equals S2, or greater than 0 if S1 is greater than S2.</p></description>
       </function>
+      <function>
+        <name>IsWildcard</name>
+        <prototype>function IsWildcard(const Pattern: String): Boolean;</prototype>
+        <description><p>Returns True if the specified pattern contains a wildcard.</p></description>
+      </function>
+      <function>
+        <name>WildcardMatch</name>
+        <prototype>function WildcardMatch(const Text, Pattern: String): Boolean;</prototype>
+        <description><p>Returns True if the specified text matches the specified pattern.</p></description>
+      </function>
     </subcategory>
     <subcategory>
       <function>
@@ -1468,7 +1478,7 @@ end;</pre></example>
       <function>
         <name>GetTempDir</name>
         <prototype>function GetTempDir: String;</prototype>
-        <description><p>Returns fully qualified path of the temporary directory, with trailing backslash. This does not use the Win32 function GetTempPath, due to platform differences.<br />Gets the temporary file path as follows:<br />1. The path specified by the TMP environment variable.<br />2. The path specified by the TEMP environment variable, if TMP is not defined or if TMP specifies a directory that does not exist.<br />3. The Windows directory, if both TMP and TEMP are not defined or specify nonexistent directories.</p></description>
+        <description><p>Returns fully qualified path of the temporary directory, with trailing backslash. This does not use the Win32 function GetTempPath, due to platform differences.<br />Gets the temporary file path as follows:<br />1. The path specified by the TMP environment variable.<br />2. The path specified by the TEMP environment variable, if TMP is not defined or if TMP specifies a directory that does not exist.<br />3. The path specified by the USERPROFILE environment variable, if both TMP and TEMP are not defined or specify nonexistent directories.<br />4. The Windows directory, if all the above TMP, TEMP and USERPROFILE are not defined or specify nonexistent directories.</p></description>
       </function>
       <function>
         <name>GetShellFolder</name>

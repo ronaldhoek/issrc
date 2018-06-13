@@ -177,6 +177,7 @@ type
     ssUninstallLogMode,
     ssUninstallRestartComputer,
     ssUninstallStyle,
+    ssUsedUserAreasWarning,
     ssUsePreviousAppDir,
     ssUsePreviousGroup,
     ssUsePreviousLanguage,
@@ -343,6 +344,8 @@ type
     FileLocationEntryFilenames: THashStringList;
     WarningsList: TLowFragStringList;
     ExpectedCustomMessageNames: TStringList;
+    UsedUserAreasWarning: Boolean;
+    UsedUserAreas: TStringList;
 
     DefaultLangData: TLangData;
     {$IFDEF UNICODE} PreLangDataList, {$ENDIF} LangDataList: TList;
@@ -504,7 +507,7 @@ type
     procedure WriteDebugEntry(Kind: TDebugEntryKind; Index: Integer);
     procedure WriteCompiledCodeText(const CompiledCodeText: Ansistring);
     procedure WriteCompiledCodeDebugInfo(const CompiledCodeDebugInfo: AnsiString);
-    function CreateMemoryStreamsFromFiles(const AFiles: String): TList;
+    function CreateMemoryStreamsFromFiles(const ADirectiveName, AFiles: String): TList;
   public
     AppData: Longint;
     CallbackProc: TCompilerCallbackProc;
@@ -717,16 +720,20 @@ begin
   until (Result <> '') or (S = '');
 end;
 
-function TSetupCompiler.CreateMemoryStreamsFromFiles(const AFiles: String): TList;
+function TSetupCompiler.CreateMemoryStreamsFromFiles(const ADirectiveName, AFiles: String): TList;
 
   procedure AddFile(const Filename: String);
   begin
     AddStatus(Format(SCompilerStatusReadingInFile, [FileName]));
-    Result.Add(CreateMemoryStreamFromFile(FileName));    
+    Result.Add(CreateMemoryStreamFromFile(FileName));
   end;
 
 var
-  S, Filename: String;
+  Filename, SearchSubDir: String;
+  AFilesList: TStringList;
+  I: Integer;
+  H: THandle;
+  FindData: TWin32FindData;
 begin
   Result := TList.Create;
   try
@@ -736,14 +743,32 @@ begin
     Filename := PrependSourceDirName(AFiles);
     if NewFileExists(Filename) then
        AddFile(Filename)
-    else begin 
-      S := AFiles;
-      while True do begin
-        Filename := ExtractStr(S, ',');
-        if Filename = '' then
-          Break;
-        Filename := PrependSourceDirName(Filename);
-        AddFile(Filename);
+    else begin
+      AFilesList := TStringList.Create;
+      try
+        ProcessWildcardsParameter(AFiles, AFilesList,
+          Format(SCompilerDirectivePatternTooLong, [ADirectiveName]));
+        for I := 0 to AFilesList.Count-1 do begin
+          Filename := PrependSourceDirName(AFilesList[I]);
+          if IsWildcard(FileName) then begin
+            H := FindFirstFile(PChar(Filename), FindData);
+            if H <> INVALID_HANDLE_VALUE then begin
+              try
+                SearchSubDir := PathExtractPath(Filename);
+                repeat
+                  if FindData.dwFileAttributes and (FILE_ATTRIBUTE_DIRECTORY or FILE_ATTRIBUTE_HIDDEN) <> 0 then
+                    Continue;
+                   AddFile(SearchSubDir + FindData.cFilename);
+                until not FindNextFile(H, FindData);
+              finally
+                Windows.FindClose(H);
+              end;
+            end;
+          end else
+            AddFile(Filename);  { use the case specified in the script }
+        end;
+      finally
+        AFilesList.Free;
       end;
     end;
   except
@@ -1710,6 +1735,9 @@ begin
   FileLocationEntryFilenames := THashStringList.Create;
   WarningsList := TLowFragStringList.Create;
   ExpectedCustomMessageNames := TStringList.Create;
+  UsedUserAreas := TStringList.Create;
+  UsedUserAreas.Sorted := True;
+  UsedUserAreas.Duplicates := dupIgnore;
   DefaultLangData := TLangData.Create;
 {$IFDEF UNICODE}
   PreLangDataList := TLowFragList.Create;
@@ -1744,6 +1772,7 @@ begin
   PreLangDataList.Free;
 {$ENDIF}
   DefaultLangData.Free;
+  UsedUserAreas.Free;
   ExpectedCustomMessageNames.Free;
   WarningsList.Free;
   FileLocationEntryFilenames.Free;
@@ -2835,12 +2864,13 @@ const
     'userinfoname', 'userinfoorg', 'userinfoserial', 'uninstallexe',
     'language', 'syswow64', 'log', 'dotnet11', 'dotnet20', 'dotnet2032',
     'dotnet2064', 'dotnet40', 'dotnet4032', 'dotnet4064', 'userpf', 'usercf');
-  ShellFolderConsts: array[0..18] of String = (
-    'group', 'userdesktop', 'userstartmenu', 'userprograms', 'userstartup',
-    'commondesktop', 'commonstartmenu', 'commonprograms', 'commonstartup',
-    'sendto', 'userappdata', 'userdocs', 'commonappdata', 'commondocs',
-    'usertemplates', 'commontemplates', 'localappdata',
-    'userfavorites', 'commonfavorites');
+  UserShellFolderConsts: array[0..8] of String = (
+    'userdesktop', 'userstartmenu', 'userprograms', 'userstartup',
+    'userappdata', 'userdocs', 'usertemplates', 'userfavorites', 'usersendto');
+  ShellFolderConsts: array[0..9] of String = (
+    'group', 'commondesktop', 'commonstartmenu', 'commonprograms', 'commonstartup',
+    'commonappdata', 'commondocs', 'commontemplates', 'localappdata',
+    'commonfavorites');
   AllowedConstsNames: array[TAllowedConst] of String = (
     'olddata', 'break');
 var
@@ -2908,6 +2938,11 @@ begin
           for K := Low(Consts) to High(Consts) do
             if Cnst = Consts[K] then
               goto 1;
+          for K := Low(UserShellFolderConsts) to High(UserShellFolderConsts) do
+            if Cnst = UserShellFolderConsts[K] then begin
+              UsedUserAreas.Add(Cnst);
+              goto 1;
+            end;
           for K := Low(ShellFolderConsts) to High(ShellFolderConsts) do
             if Cnst = ShellFolderConsts[K] then
               goto 1;
@@ -3767,7 +3802,7 @@ begin
         AIncludes := TStringList.Create;
         try
           ProcessWildcardsParameter(Value, AIncludes,
-            SCompilerDirectiveCloseApplicationsFilterTooLong);
+            Format(SCompilerDirectivePatternTooLong, ['CloseApplicationsFilter']));
           SetupHeader.CloseApplicationsFilter := StringsToCommaString(AIncludes);
         finally
           AIncludes.Free;
@@ -4219,6 +4254,9 @@ begin
       end;
     ssUsePreviousAppDir: begin
         SetSetupHeaderOption(shUsePreviousAppDir);
+      end;
+    ssUsedUserAreasWarning: begin
+        UsedUserAreasWarning := StrToBool(Value);
       end;
     ssUsePreviousGroup: begin
         SetSetupHeaderOption(shUsePreviousGroup);
@@ -5453,9 +5491,10 @@ begin
       end;
       if S = 'HKCR' then
         RootKey := HKEY_CLASSES_ROOT
-      else if S = 'HKCU' then
-        RootKey := HKEY_CURRENT_USER
-      else if S = 'HKLM' then
+      else if S = 'HKCU' then begin
+        UsedUserAreas.Add(S);
+        RootKey := HKEY_CURRENT_USER;
+      end else if S = 'HKLM' then
         RootKey := HKEY_LOCAL_MACHINE
       else if S = 'HKU' then
         RootKey := HKEY_USERS
@@ -8416,6 +8455,7 @@ var
   I: Integer;
   AppNameHasConsts, AppVersionHasConsts, AppPublisherHasConsts,
     AppCopyrightHasConsts, AppIdHasConsts, Uninstallable: Boolean;
+  PrivilegesRequiredValue: String;
 begin
   { Sanity check: A single TSetupCompiler instance cannot be used to do
     multiple compiles. A separate instance must be used for each compile,
@@ -8491,6 +8531,7 @@ begin
     SignToolRetryDelay := 500;
     SetupHeader.CloseApplicationsFilter := '*.exe,*.dll,*.chm';
     SetupHeader.WizardImageAlphaFormat := afIgnored;
+    UsedUserAreasWarning := True;
 
     { Read [Setup] section }
     EnumIniSection(EnumSetup, 'Setup', 0, 0, True, True, '', False, False);
@@ -8706,10 +8747,10 @@ begin
     { Read wizard image }
     LineNumber := SetupDirectiveLines[ssWizardImageFile];
     AddStatus(Format(SCompilerStatusReadingFile, ['WizardImageFile']));
-    WizardImages := CreateMemoryStreamsFromFiles(WizardImageFile);
+    WizardImages := CreateMemoryStreamsFromFiles('WizardImageFile', WizardImageFile);
     LineNumber := SetupDirectiveLines[ssWizardSmallImageFile];
     AddStatus(Format(SCompilerStatusReadingFile, ['WizardSmallImageFile']));
-    WizardSmallImages := CreateMemoryStreamsFromFiles(WizardSmallImageFile);
+    WizardSmallImages := CreateMemoryStreamsFromFiles('WizardSmallImageFile', WizardSmallImageFile);
     LineNumber := 0;
 
     { Prepare Setup executable & signed uninstaller data }
@@ -8886,6 +8927,16 @@ begin
       EnumFiles('', 1, 0);
     EnumIniSection(EnumFiles, 'Files', 0, 0, True, True, '', False, False);
     CallIdleProc;
+
+    if UsedUserAreasWarning and (UsedUserAreas.Count > 0) and
+       (SetupHeader.PrivilegesRequired in [prPowerUser, prAdmin]) then begin
+      if SetupHeader.PrivilegesRequired = prPowerUser then
+        PrivilegesRequiredValue := 'poweruser'
+      else
+        PrivilegesRequiredValue := 'admin';
+      WarningsList.Add(Format(SCompilerUsedUserAreasWarning, ['Setup',
+        'PrivilegesRequired', PrivilegesRequiredValue, UsedUserAreas.CommaText]));
+    end;
 
     { Read decompressor DLL. Must be done after [Files] is parsed, since
       SetupHeader.CompressMethod isn't set until then }
