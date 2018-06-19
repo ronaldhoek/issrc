@@ -43,15 +43,20 @@
 // 6 - conditional inclusion acknowledgements
 // 7 - reserved
 // 8 - show strings emitted with #emit directive
-// 9 - macro and functions successfull call acknowledgements
+// 9 - macro and functions successful call acknowledgements
 //10 - Local macro array allocation acknowledgements
 //
 //#pragma verboselevel 0
 //
 #ifndef __POPT_P__
 # define private CStrings
-# pragma parseroption -p+
+#else
+# pragma parseroption -p-
 #endif
+
+#define NewLine "\n"
+#pragma parseroption -p+
+
 //
 #pragma spansymbol "\"
 //
